@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+/Users/karanrajput/esp5.3/rtos/build/CMakeFiles/bootloader
+/Users/karanrajput/esp5.3/rtos/build/CMakeFiles/bootloader.rule
+/Users/karanrajput/esp5.3/rtos/build/CMakeFiles/bootloader-complete.rule
+/Users/karanrajput/esp5.3/rtos/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
+/Users/karanrajput/esp5.3/rtos/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+/Users/karanrajput/esp5.3/rtos/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+/Users/karanrajput/esp5.3/rtos/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+/Users/karanrajput/esp5.3/rtos/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+/Users/karanrajput/esp5.3/rtos/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+/Users/karanrajput/esp5.3/rtos/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule
