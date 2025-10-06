@@ -1,4 +1,4 @@
-#include <stdio.h>
+ #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/gpio.h"
@@ -10,7 +10,6 @@
 #define uxItemSize sizeof(int)
 #define FSR_PIN  GPIO_NUM_32
 #define LED_PIN  GPIO_NUM_2
-
 QueueHandle_t myQueue;
 TaskHandle_t producer_handle = NULL;
 TaskHandle_t consumer_handle = NULL; 
@@ -27,19 +26,14 @@ void producer_task(void *params) {
 }
 
  void producer_task2(void *params) {
-    int lost_count = 0;
     while (1) {
-      int raw = adc1_get_raw(ADC1_CHANNEL_4);
-        
-        // Non-blocking send with 0 timeout
-        if (xQueueSend(myQueue, &raw, 0) == pdPASS) {
-            printf("✓ Producer1 sent: %d\n", raw);
-        } else {
-            lost_count++;
-            printf("❌ Producer1 LOST data! (Total lost: %d)\n", lost_count);
-        }
-        
-        vTaskDelay(pdMS_TO_TICKS(10));
+      int data = 1000 + (esp_random() % 100);  // 1000-1099
+        printf("[P1] Sent: %d\n", data);
+        int data2 = 2000 + (esp_random() % 100);  // 2000-2099
+        printf("[P2] Sent: %d\n", data2);
+        xQueueSend(myQueue, &data, portMAX_DELAY);
+        xQueueSend(myQueue, &data2, portMAX_DELAY);
+        vTaskDelay(pdMS_TO_TICKS(8));
     }
 }
 
@@ -49,7 +43,7 @@ void consumer_task(void *params) {
           // Check queue status
         UBaseType_t items_waiting = uxQueueMessagesWaiting(myQueue);
         UBaseType_t spaces_available = uxQueueSpacesAvailable(myQueue);
-        
+
         printf("Queue: %d items waiting, %d spaces free\n", items_waiting, spaces_available);
 
         if (xQueueReceive(myQueue, &received_value, 0) == pdPASS) {
@@ -61,7 +55,7 @@ void consumer_task(void *params) {
             }
         }
         // Delay happens EVERY loop iteration
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(100));
         xQueuePeek(myQueue, &received_value, 0);
     }
 }
@@ -70,10 +64,11 @@ void app_main(void) {
     adc1_config_width(ADC_WIDTH_BIT_12);
     adc1_config_channel_atten(ADC1_CHANNEL_4, ADC_ATTEN_DB_11);
     gpio_set_direction(LED_PIN, GPIO_MODE_OUTPUT);
-    
+
     myQueue = xQueueCreate(uxQueueLength, uxItemSize);
     xTaskCreatePinnedToCore(producer_task, "Producer", 2048, NULL, 5, &producer_handle,0);
     xTaskCreate(consumer_task, "Consumer", 2048, NULL, 5, &consumer_handle);
     xTaskCreatePinnedToCore(producer_task2, "Producer2", 2048, NULL, 5, &producer_handle2,1);
-   
+
 }
+
