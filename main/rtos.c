@@ -2,80 +2,78 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/gpio.h"
+#include "freertos/queue.h"
 #include "driver/adc.h"
+#include "esp_random.h"
 
-#define LED_PIN   GPIO_NUM_2
-#define FSR_PIN  GPIO_NUM_25
+#define uxQueueLength (1) // Number of items the queue can hold at a time 
+#define uxItemSize sizeof(int)
+#define FSR_PIN  GPIO_NUM_32
+#define LED_PIN  GPIO_NUM_2
 
-TaskHandle_t ledtask1_handle = NULL;
-TaskHandle_t ledtask2_handle = NULL;
-TaskHandle_t ledtask3_handle = NULL;
+QueueHandle_t myQueue;
+TaskHandle_t producer_handle = NULL;
+TaskHandle_t consumer_handle = NULL; 
+TaskHandle_t producer_handle2 = NULL;
 
-// LED toggle helper
-void toggle_led(uint32_t delay_ms) {
-    gpio_set_level(LED_PIN, 1);
-    vTaskDelay(delay_ms / portTICK_PERIOD_MS);
-    gpio_set_level(LED_PIN, 0);
-    vTaskDelay(delay_ms / portTICK_PERIOD_MS);
-}
-
-void ledtask1(void *pvParameters) {
+void producer_task(void *params) {
     while (1) {
-        printf("ledtask1 running\n");
-        toggle_led(1000);
+        int raw = adc1_get_raw(ADC1_CHANNEL_4);
+        printf("Produced: %d\n", raw);
+
+        vTaskDelay(pdMS_TO_TICKS(10));
+        xQueueSend(myQueue, &raw, portMAX_DELAY);
     }
 }
 
-void ledtask2(void *pvParameters) {
+ void producer_task2(void *params) {
+    int lost_count = 0;
     while (1) {
-        printf("ledtask2 running\n");
-        toggle_led(5000);
-    }
-}
-
-void ledtask3(void *pvParameters) {
-    while (1) {
-        printf("ledtask3 running\n");
-        toggle_led(2000);
-    }
-}
-
-void supervisor_task(void *pvParameters) {
-    // Configure FSR once
-    adc1_config_width(ADC_WIDTH_BIT_12);
-    adc1_config_channel_atten(ADC1_CHANNEL_6, ADC_ATTEN_DB_11);
-
-    while (1) {
-        int raw = adc1_get_raw(ADC1_CHANNEL_6);
-        printf("FSR raw value: %d\n", raw);
-
-        if (raw > 100) {
-            // Only ledtask3 active
-            if (ledtask1_handle) vTaskSuspend(ledtask1_handle);
-            if (ledtask2_handle) vTaskSuspend(ledtask2_handle);
-            if (ledtask3_handle) vTaskResume(ledtask3_handle);
+      int raw = adc1_get_raw(ADC1_CHANNEL_4);
+        
+        // Non-blocking send with 0 timeout
+        if (xQueueSend(myQueue, &raw, 0) == pdPASS) {
+            printf("✓ Producer1 sent: %d\n", raw);
         } else {
-            // ledtask1 and ledtask2 active
-            if (ledtask3_handle) vTaskSuspend(ledtask3_handle);
-            if (ledtask1_handle) vTaskResume(ledtask1_handle);
-            if (ledtask2_handle) vTaskResume(ledtask2_handle);
+            lost_count++;
+            printf("❌ Producer1 LOST data! (Total lost: %d)\n", lost_count);
         }
+        
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
 
-        vTaskDelay(200 / portTICK_PERIOD_MS);
+void consumer_task(void *params) {
+    while (1) {
+        int received_value;
+          // Check queue status
+        UBaseType_t items_waiting = uxQueueMessagesWaiting(myQueue);
+        UBaseType_t spaces_available = uxQueueSpacesAvailable(myQueue);
+        
+        printf("Queue: %d items waiting, %d spaces free\n", items_waiting, spaces_available);
+
+        if (xQueueReceive(myQueue, &received_value, 0) == pdPASS) {
+            printf("Consumed: %d\n", received_value);
+            if (received_value > 2000) {
+                gpio_set_level(LED_PIN, 1);
+            } else {
+                gpio_set_level(LED_PIN, 0);
+            }
+        }
+        // Delay happens EVERY loop iteration
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        xQueuePeek(myQueue, &received_value, 0);
     }
 }
 
 void app_main(void) {
-    // Configure GPIO once
+    adc1_config_width(ADC_WIDTH_BIT_12);
+    adc1_config_channel_atten(ADC1_CHANNEL_4, ADC_ATTEN_DB_11);
     gpio_set_direction(LED_PIN, GPIO_MODE_OUTPUT);
-
-    // Create all tasks once
-    xTaskCreate(ledtask1, "ledtask1", 2048, NULL, 8, &ledtask1_handle);
-    xTaskCreate(ledtask2, "ledtask2", 2048, NULL, 9, &ledtask2_handle);
-    xTaskCreate(ledtask3, "ledtask3", 2048, NULL, 3, &ledtask3_handle);
-
-    // Initially suspend ledtask3
-    if (ledtask3_handle) vTaskSuspend(ledtask3_handle);
-
-    xTaskCreate(supervisor_task, "supervisor", 2048, NULL, 10, NULL);
+    
+    myQueue = xQueueCreate(uxQueueLength, uxItemSize);
+    xTaskCreatePinnedToCore(producer_task, "Producer", 2048, NULL, 5, &producer_handle,0);
+    xTaskCreate(consumer_task, "Consumer", 2048, NULL, 5, &consumer_handle);
+    xTaskCreatePinnedToCore(producer_task2, "Producer2", 2048, NULL, 5, &producer_handle2,1);
+   
 }
