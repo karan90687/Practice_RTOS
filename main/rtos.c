@@ -6,69 +6,50 @@
 #include "driver/adc.h"
 #include "esp_random.h"
 
-#define uxQueueLength (1) // Number of items the queue can hold at a time 
-#define uxItemSize sizeof(int)
-#define FSR_PIN  GPIO_NUM_32
-#define LED_PIN  GPIO_NUM_2
-QueueHandle_t myQueue;
-TaskHandle_t producer_handle = NULL;
-TaskHandle_t consumer_handle = NULL; 
-TaskHandle_t producer_handle2 = NULL;
-
-void producer_task(void *params) {
-    while (1) {
-        int raw = adc1_get_raw(ADC1_CHANNEL_4);
-        printf("Produced: %d\n", raw);
-
-        vTaskDelay(pdMS_TO_TICKS(10));
-        xQueueSend(myQueue, &raw, portMAX_DELAY);
+TaskHandle_t task1_handle = NULL;
+TaskHandle_t task2_handle = NULL;
+TaskHandle_t task3_handle = NULL;
+SemaphoreHandle_t xMutex;
+void task1(void *pvParameters)
+{
+    while(1)
+    {
+        xSemaphoreTake(xMutex, portMAX_DELAY);
+        printf("Task 1 is running, hey i am karan here i am practicing rtos concepts in order to sharpen my skills in embedded system and IoT. The goal is not to devlop a code for any random thing the goal is to maek a product which solves any problem of the society so that i will be proud to be an engineer.\n");
+        xSemaphoreGive(xMutex);
+        vTaskDelay(pdMS_TO_TICKS(10)); // Delay for 1000 ms
     }
 }
-
- void producer_task2(void *params) {
-    while (1) {
-      int data = 1000 + (esp_random() % 100);  // 1000-1099
-        printf("[P1] Sent: %d\n", data);
-        int data2 = 2000 + (esp_random() % 100);  // 2000-2099
-        printf("[P2] Sent: %d\n", data2);
-        xQueueSend(myQueue, &data, portMAX_DELAY);
-        xQueueSend(myQueue, &data2, portMAX_DELAY);
-        vTaskDelay(pdMS_TO_TICKS(8));
+void task2(void *pvParameters)
+{
+    while(1)
+    {
+        xSemaphoreTake(xMutex, portMAX_DELAY);
+        printf("Task 2 is running, hey i am karan here i am practicing rtos concepts in order to sharpen my skills in embedded system and IoT. The goal is not to devlop a code for any random thing the goal is to maek a product which solves any problem of the society so that i will be proud to be an engineer.\n");
+        xSemaphoreGive(xMutex);
+        vTaskDelay(pdMS_TO_TICKS(10)); // Delay for 1000 ms
+        
     }
 }
+void task3(void *pvParameters)
+{
+    while(1)
+    {
+        xSemaphoreTake(xMutex, portMAX_DELAY);
+        printf("Task 3 is running, hey i am karan here i am practicing rtos concepts in order to sharpen   my skills in embedded system and IoT. The goal is not to devlop a code for any random thing the goal is to maek a product which solves any problem of the society so that i will be proud to be an engineer.\n");
+        xSemaphoreGive(xMutex);
 
-void consumer_task(void *params) {
-    while (1) {
-        int received_value;
-          // Check queue status
-        UBaseType_t items_waiting = uxQueueMessagesWaiting(myQueue);
-        UBaseType_t spaces_available = uxQueueSpacesAvailable(myQueue);
-
-        printf("Queue: %d items waiting, %d spaces free\n", items_waiting, spaces_available);
-
-        if (xQueueReceive(myQueue, &received_value, 0) == pdPASS) {
-            printf("Consumed: %d\n", received_value);
-            if (received_value > 2000) {
-                gpio_set_level(LED_PIN, 1);
-            } else {
-                gpio_set_level(LED_PIN, 0);
-            }
-        }
-        // Delay happens EVERY loop iteration
-        vTaskDelay(pdMS_TO_TICKS(100));
-        xQueuePeek(myQueue, &received_value, 0);
+        vTaskDelay(pdMS_TO_TICKS(10)); // Delay for 1000 ms
+       
     }
-}
-
-void app_main(void) {
-    adc1_config_width(ADC_WIDTH_BIT_12);
-    adc1_config_channel_atten(ADC1_CHANNEL_4, ADC_ATTEN_DB_11);
-    gpio_set_direction(LED_PIN, GPIO_MODE_OUTPUT);
-
-    myQueue = xQueueCreate(uxQueueLength, uxItemSize);
-    xTaskCreatePinnedToCore(producer_task, "Producer", 2048, NULL, 5, &producer_handle,0);
-    xTaskCreate(consumer_task, "Consumer", 2048, NULL, 5, &consumer_handle);
-    xTaskCreatePinnedToCore(producer_task2, "Producer2", 2048, NULL, 5, &producer_handle2,1);
 
 }
+void app_main(void)
+{
+    xMutex = xSemaphoreCreateMutex();
 
+    xTaskCreate(task1, "Task 1", 2048, NULL, 5, &task1_handle);
+    xTaskCreate(task2, "Task 2", 2048, NULL, 5, &task2_handle);
+    xTaskCreate(task3, "Task 3", 2048, NULL, 5, &task3_handle);
+
+}
